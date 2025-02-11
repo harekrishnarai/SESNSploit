@@ -38,7 +38,7 @@ def pause():
     input(f"\n{Fore.GREEN}Press Enter to return to the main menu...{Style.RESET_ALL}")
 
 def figlet_header():
-    ascii_art = pyfiglet.figlet_format("Snare", font="slant")
+    ascii_art = pyfiglet.figlet_format("Redsense", font="slant")
     print(Fore.RED + ascii_art + Style.RESET_ALL)
     print(f"{Fore.YELLOW}Copyright © {COPYRIGHT_OWNER}{Style.RESET_ALL}")
 
