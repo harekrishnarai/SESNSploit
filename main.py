@@ -5,6 +5,7 @@ while clearly storing and using region information along with each retrieved val
 """
 
 import boto3
+
 from botocore.exceptions import ClientError, EndpointConnectionError
 import pyfiglet
 import time
@@ -26,6 +27,7 @@ regions = [
     'eu-west-3', 'me-central-1', 'me-south-1', 'sa-east-1', 'us-east-1', 'us-east-2',
     'us-west-1', 'us-west-2'
 ]
+
 
 # ----------------------- Utility Functions -----------------------
 
