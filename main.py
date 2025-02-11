@@ -8,6 +8,7 @@ import os
 import colorama
 from colorama import Fore, Back, Style
 import random
+import json  # For state saving
 
 # Initialize colorama for cross-platform colored terminal text
 colorama.init()
@@ -146,6 +147,16 @@ def check_sns_misconfigurations(session):
         except ClientError:
             print(f"\n{Fore.RED}Error accessing topics in {region}.{Style.RESET_ALL}")
 
+def save_state(state, filename='state.json'):
+    with open(filename, 'w') as f:
+        json.dump(state, f)
+
+def load_state(filename='state.json'):
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
+    return None
+
 def main():
     figlet_header()
     profile_name = select_profile()
@@ -154,6 +165,12 @@ def main():
         session = boto3.Session(profile_name=profile_name)
     else:
         session = boto3.Session()
+
+    state = load_state()
+    if state:
+        print(f"{Fore.YELLOW}Resuming from last saved state.{Style.RESET_ALL}")
+    else:
+        state = {'last_choice': None}
 
     while True:
         print(f"\n{Fore.BLUE}1. Check Active Regions for SNS 🔍")
@@ -186,6 +203,9 @@ def main():
             break
         else:
             print(f"{Fore.RED}Invalid option, please try again.{Style.RESET_ALL}")
+
+        state['last_choice'] = choice
+        save_state(state)
 
         # Add a small delay to avoid rate limiting
         time.sleep(0.5)
