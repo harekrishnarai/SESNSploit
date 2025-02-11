@@ -1,10 +1,10 @@
-# Snare
+# Redsense
 
 A tool for identifying and exploiting misconfigurations in AWS SNS and SES services.
 
 ## Overview
 
-Snare is designed to perform various reconnaissance and exploitation tasks related to AWS Simple Notification Service (SNS) and Simple Email Service (SES). It provides a user-friendly interface to check for active regions, inspect topic attributes, list subscriptions, send messages, and detect misconfigurations.
+Redsense is designed to perform various reconnaissance and exploitation tasks related to AWS Simple Notification Service (SNS) and Simple Email Service (SES). It provides a user-friendly interface to check for active regions, inspect topic attributes, list subscriptions, send messages, and detect misconfigurations.
 
 ## Usage
 
@@ -13,8 +13,8 @@ Snare is designed to perform various reconnaissance and exploitation tasks relat
 1. **Clone the Repository:**
 
    ```bash
-   git clone https://github.com/harekrishnarai/snare
-   cd snare
+   git clone https://github.com/harekrishnarai/Redsense
+   cd Redsense
    ```
 
 2. **Install Dependencies:**
@@ -40,7 +40,7 @@ Snare is designed to perform various reconnaissance and exploitation tasks relat
 - Execute the script with:
 
   ```bash
-  python snare.py
+  python Redsense.py
   ```
 
 - You will be greeted with a menu offering several options:
