@@ -13,7 +13,7 @@ Snare is designed to perform various reconnaissance and exploitation tasks relat
 1. **Clone the Repository:**
 
    ```bash
-   git clone <your-repository-url>
+   git clone https://github.com/harekrishnarai/snare
    cd snare
    ```
 
