@@ -4,6 +4,13 @@ import boto3
 from botocore.exceptions import ClientError
 import pyfiglet
 import time
+import os
+import colorama
+from colorama import Fore, Back, Style
+import random
+
+# Initialize colorama for cross-platform colored terminal text
+colorama.init()
 
 # Your name for copyright
 COPYRIGHT_OWNER = "Harekrishna Rai"
@@ -18,121 +25,167 @@ regions = [
 
 def figlet_header():
     ascii_art = pyfiglet.figlet_format("Snare", font = "slant")
-    print(ascii_art)
-    print(f"Copyright © {COPYRIGHT_OWNER}")
+    print(Fore.RED + ascii_art + Style.RESET_ALL)
+    print(f"{Fore.YELLOW}Copyright © {COPYRIGHT_OWNER}{Style.RESET_ALL}")
 
-def check_service_in_region(service, region):
+def list_available_profiles():
+    profiles = []
+    config_path = os.path.expanduser('~/.aws/config')
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            for line in f:
+                if line.strip().startswith('[') and 'profile ' in line:
+                    profiles.append(line.split('profile ')[1].strip()[:-1])  # Remove the closing bracket
+    return profiles
+
+def select_profile():
+    profiles = list_available_profiles()
+    if not profiles:
+        print(f"{Fore.RED}No AWS profiles found in ~/.aws/config.{Style.RESET_ALL}")
+        return None
+    print(f"{Fore.CYAN}Available AWS Profiles:{Style.RESET_ALL}")
+    for i, profile in enumerate(profiles, 1):
+        print(f"{i}. {profile}")
+    choice = input(f"{Fore.GREEN}Select profile number (or press Enter for default): {Style.RESET_ALL}")
+    if choice == "":
+        return None  # Use default profile
+    try:
+        return profiles[int(choice) - 1]
+    except (ValueError, IndexError):
+        print(f"{Fore.RED}Invalid selection. Using default profile.{Style.RESET_ALL}")
+        return None
+
+def loading_animation():
+    animations = ['[■□□□□□□□□□]', '[■■□□□□□□□□]', '[■■■□□□□□□□]', '[■■■■□□□□□□]', '[■■■■■□□□□□]', '[■■■■■■□□□□]', '[■■■■■■■□□□]', '[■■■■■■■■□□]', '[■■■■■■■■■□]', '[■■■■■■■■■■]']
+    for i in range(20):
+        print(f"\r{animations[i % len(animations)]}", end='', flush=True)
+        time.sleep(0.1)
+
+def check_service_in_region(service, region, session):
     try:
         if service == 'sns':
-            client = boto3.client('sns', region_name=region)
+            client = session.client('sns', region_name=region)
             client.list_topics()
         elif service == 'ses':
-            client = boto3.client('ses', region_name=region)
+            client = session.client('ses', region_name=region)
             client.list_identities()
-        print(f"{service.upper()} is active in {region}")
+        print(f"{Fore.GREEN}{service.upper()} is active in {region}{Style.RESET_ALL}")
         return True
     except ClientError as e:
         if e.response['Error']['Code'] == 'InvalidClientTokenId':
-            print(f"Credentials are not valid for {service.upper()} in {region}")
+            print(f"{Fore.RED}Credentials are not valid for {service.upper()} in {region}{Style.RESET_ALL}")
         else:
-            print(f"{service.upper()} is not active in {region}")
+            print(f"{Fore.YELLOW}{service.upper()} is not active in {region}{Style.RESET_ALL}")
         return False
 
-def list_active_regions(service):
+def list_active_regions(service, session):
     active_regions = []
+    print(f"{Fore.CYAN}Checking regions for {service.upper()}:{Style.RESET_ALL}")
     for region in regions:
-        if check_service_in_region(service, region):
+        loading_animation()
+        if check_service_in_region(service, region, session):
             active_regions.append(region)
+    print("\n")
     return active_regions
 
-def get_topic_attributes():
-    topic_arn = input("Enter the ARN of the topic to check attributes: ")
+def get_topic_attributes(session):
+    topic_arn = input(f"{Fore.GREEN}Enter the ARN of the topic to check attributes: {Style.RESET_ALL}")
     try:
-        sns = boto3.client('sns')
+        sns = session.client('sns')
         attributes = sns.get_topic_attributes(TopicArn=topic_arn)
-        print(f"Attributes of Topic {topic_arn}:")
+        print(f"{Fore.CYAN}Attributes of Topic {topic_arn}:{Style.RESET_ALL}")
         for key, value in attributes['Attributes'].items():
             print(f"  {key}: {value}")
     except ClientError as e:
-        print(f"Error: {e.response['Error']['Message']}")
+        print(f"{Fore.RED}Error: {e.response['Error']['Message']}{Style.RESET_ALL}")
 
-def list_subscriptions():
-    topic_arn = input("Enter the ARN of the topic to list subscriptions: ")
+def list_subscriptions(session):
+    topic_arn = input(f"{Fore.GREEN}Enter the ARN of the topic to list subscriptions: {Style.RESET_ALL}")
     try:
-        sns = boto3.client('sns')
+        sns = session.client('sns')
         subscriptions = sns.list_subscriptions_by_topic(TopicArn=topic_arn)
-        print(f"Subscriptions for {topic_arn}:")
+        print(f"{Fore.CYAN}Subscriptions for {topic_arn}:{Style.RESET_ALL}")
         for sub in subscriptions['Subscriptions']:
             print(f"  - {sub['SubscriptionArn']}")
     except ClientError as e:
-        print(f"Error: {e.response['Error']['Message']}")
+        print(f"{Fore.RED}Error: {e.response['Error']['Message']}{Style.RESET_ALL}")
 
-def send_message():
-    topic_arn = input("Enter the ARN of the topic to send message: ")
-    message = input("Enter the message to send: ")
+def send_message(session):
+    topic_arn = input(f"{Fore.GREEN}Enter the ARN of the topic to send message: {Style.RESET_ALL}")
+    message = input(f"{Fore.GREEN}Enter the message to send: {Style.RESET_ALL}")
     try:
-        sns = boto3.client('sns')
+        sns = session.client('sns')
         response = sns.publish(TopicArn=topic_arn, Message=message)
-        print(f"Message ID: {response['MessageId']}")
+        print(f"{Fore.CYAN}Message ID: {response['MessageId']}{Style.RESET_ALL}")
     except ClientError as e:
-        print(f"Error: {e.response['Error']['Message']}")
+        print(f"{Fore.RED}Error: {e.response['Error']['Message']}{Style.RESET_ALL}")
 
-def brute_force_regions():
-    print("Brute-forcing regions for SNS and SES:")
+def brute_force_regions(session):
+    print(f"{Fore.CYAN}Brute-forcing regions for SNS and SES:{Style.RESET_ALL}")
     for region in regions:
-        check_service_in_region('sns', region)
-        check_service_in_region('ses', region)
+        loading_animation()
+        check_service_in_region('sns', region, session)
+        check_service_in_region('ses', region, session)
+    print("\n")
 
-def check_sns_misconfigurations():
-    print("Checking for SNS misconfigurations:")
-    sns = boto3.client('sns')
+def check_sns_misconfigurations(session):
+    print(f"{Fore.CYAN}Checking for SNS misconfigurations:{Style.RESET_ALL}")
+    sns = session.client('sns')
     for region in regions:
         try:
             topics = sns.list_topics()['Topics']
             for topic in topics:
+                loading_animation()
                 attributes = sns.get_topic_attributes(TopicArn=topic['TopicArn'])
                 policy = attributes['Attributes'].get('Policy')
                 if policy:
-                    print(f"Topic {topic['TopicArn']} has a policy:")
+                    print(f"\n{Fore.GREEN}Topic {topic['TopicArn']} has a policy:{Style.RESET_ALL}")
                     print(policy)
                 else:
-                    print(f"Topic {topic['TopicArn']} has no explicit policy set.")
+                    print(f"\n{Fore.YELLOW}Topic {topic['TopicArn']} has no explicit policy set.{Style.RESET_ALL}")
         except ClientError:
-            print(f"Error accessing topics in {region}.")
+            print(f"\n{Fore.RED}Error accessing topics in {region}.{Style.RESET_ALL}")
 
 def main():
     figlet_header()
+    profile_name = select_profile()
+    
+    if profile_name:
+        session = boto3.Session(profile_name=profile_name)
+    else:
+        session = boto3.Session()
+
     while True:
-        print("\n1. Check Active Regions for SNS")
-        print("2. Check Active Regions for SES")
-        print("3. Get SNS Topic Attributes")
-        print("4. List Subscriptions for an SNS Topic")
-        print("5. Send a Message to an SNS Topic")
-        print("6. Brute-Force Check Regions for SNS and SES")
-        print("7. Check for SNS Topic Misconfigurations")
-        print("8. Exit")
+        print(f"\n{Fore.BLUE}1. Check Active Regions for SNS 🔍")
+        print("2. Check Active Regions for SES 🔍")
+        print("3. Get SNS Topic Attributes 📊")
+        print("4. List Subscriptions for an SNS Topic 📋")
+        print("5. Send a Message to an SNS Topic 📩")
+        print("6. Brute-Force Check Regions for SNS and SES 💣")
+        print("7. Check for SNS Topic Misconfigurations 🚨")
+        print("8. Exit 🚪{Style.RESET_ALL}")
         
-        choice = input("Choose an option: ")
+        choice = input(f"{Fore.GREEN}Choose an option: {Style.RESET_ALL}")
 
         if choice == '1':
-            list_active_regions('sns')
+            list_active_regions('sns', session)
         elif choice == '2':
-            list_active_regions('ses')
+            list_active_regions('ses', session)
         elif choice == '3':
-            get_topic_attributes()
+            get_topic_attributes(session)
         elif choice == '4':
-            list_subscriptions()
+            list_subscriptions(session)
         elif choice == '5':
-            send_message()
+            send_message(session)
         elif choice == '6':
-            brute_force_regions()
+            brute_force_regions(session)
         elif choice == '7':
-            check_sns_misconfigurations()
+            check_sns_misconfigurations(session)
         elif choice == '8':
-            print("Exiting program.")
+            print(f"{Fore.YELLOW}Exiting program.{Style.RESET_ALL}")
             break
         else:
-            print("Invalid option, please try again.")
+            print(f"{Fore.RED}Invalid option, please try again.{Style.RESET_ALL}")
 
         # Add a small delay to avoid rate limiting
         time.sleep(0.5)
