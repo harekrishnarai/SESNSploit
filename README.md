@@ -1,10 +1,10 @@
-# Redsense
+# SESNSploit
 
 A tool for identifying and exploiting misconfigurations in AWS SNS and SES services.
 
 ## Overview
 
-Redsense is designed to perform various reconnaissance and exploitation tasks related to AWS Simple Notification Service (SNS) and Simple Email Service (SES). It provides a user-friendly interface to check for active regions, inspect topic attributes, list subscriptions, send messages, and detect misconfigurations.
+SESNSploit is designed to perform various reconnaissance and exploitation tasks related to AWS Simple Notification Service (SNS) and Simple Email Service (SES). It provides a user-friendly interface to check for active regions, inspect topic attributes, list subscriptions, send messages, and detect misconfigurations.
 
 ## Main Script
 
@@ -50,8 +50,8 @@ The tool saves its state in a `state.json` file, allowing you to resume your ses
 1. **Clone the Repository:**
 
    ```bash
-   git clone https://github.com/harekrishnarai/Redsense
-   cd Redsense
+   git clone https://github.com/harekrishnarai/SESNSploit
+   cd SESNSploit
    ```
 
 2. **Install Dependencies:**
