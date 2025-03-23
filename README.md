@@ -2,7 +2,9 @@
 
 A tool for identifying and exploiting misconfigurations in AWS SNS and SES services.
 
-[](/media/demo.gif)
+## Demo
+
+![SESNSploit Demo](/media/demo.gif)
 
 ## Overview
 
