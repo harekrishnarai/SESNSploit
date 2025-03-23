@@ -2,6 +2,8 @@
 
 A tool for identifying and exploiting misconfigurations in AWS SNS and SES services.
 
+[](/media/demo.gif)
+
 ## Overview
 
 SESNSploit is designed to perform various reconnaissance and exploitation tasks related to AWS Simple Notification Service (SNS) and Simple Email Service (SES). It provides a user-friendly interface to check for active regions, inspect topic attributes, list subscriptions, send messages, and detect misconfigurations.
