@@ -1,0 +1,35 @@
+# Variables for SESNSploit Test Data Infrastructure
+
+# Basic Configuration
+primary_region = "us-east-1"
+environment    = "sesnsloit-test"
+
+# Domain Configuration (IMPORTANT: Use a domain you control)
+test_email_domain = "test.example.com"  # Change this to your domain
+
+# Feature Flags
+create_cross_region_resources = true   # Set to false to reduce costs
+create_vulnerable_configs     = true   # Set to false for production-like testing
+
+# Example configurations for different scenarios:
+
+# Minimal setup (single region, no vulnerable configs)
+# primary_region = "us-east-1"
+# environment = "minimal-test"
+# test_email_domain = "yourdomain.com"
+# create_cross_region_resources = false
+# create_vulnerable_configs = false
+
+# Full testing setup (multiple regions, vulnerable configs)
+# primary_region = "us-east-1"
+# environment = "full-test"
+# test_email_domain = "yourdomain.com"
+# create_cross_region_resources = true
+# create_vulnerable_configs = true
+
+# Production-like testing (secure configs only)
+# primary_region = "us-east-1"
+# environment = "prod-like-test"
+# test_email_domain = "yourdomain.com"
+# create_cross_region_resources = true
+# create_vulnerable_configs = false

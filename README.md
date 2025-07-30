@@ -47,6 +47,58 @@ The tool saves its state in a `state.json` file, allowing you to resume your ses
 - **Brute-Force Check Regions:** Attempts to check all AWS regions for SNS and SES activity.
 - **Check for SNS Topic Misconfigurations:** Looks for potentially insecure configurations in SNS topics.
 
+## Test Infrastructure
+
+For testing and demonstration purposes, this repository includes comprehensive test infrastructure that can be deployed to AWS.
+
+### Quick Setup
+```bash
+# Deploy test infrastructure
+make deploy
+
+# Test the tool
+make test-tool
+
+# Clean up
+make destroy
+```
+
+### Using Terraform Directly
+```bash
+# Copy and configure variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars and set your domain
+
+# Deploy infrastructure
+terraform init
+terraform apply
+
+# Use the tool with deployed resources
+python3 main.py
+```
+
+### What Gets Deployed
+- **SNS Topics**: Multiple topics across regions with various configurations
+- **SES Identities**: Domain and email identities for testing
+- **IAM Roles**: Different permission levels for testing scenarios
+- **Supporting Infrastructure**: Lambda functions, SQS queues, S3 buckets
+
+For detailed information, see [TEST-INFRASTRUCTURE.md](TEST-INFRASTRUCTURE.md).
+
+## Attack Scenarios
+
+The `attack-scenarios/` directory contains comprehensive red team testing scenarios:
+
+- **Attack 1**: SNS Topic Hijacking
+- **Attack 2**: SES Identity Spoofing  
+- **Attack 3**: Cross-Service Privilege Escalation
+- **Attack 4**: SNS-SES Lateral Movement
+- **Attack 5**: Configuration and Data Extraction
+
+Each scenario includes vulnerable infrastructure, exploitation guides, and security remediations.
+
+See [attack-scenarios/README.md](attack-scenarios/README.md) for detailed documentation.
+
 ## Usage
 
 ### Installation
