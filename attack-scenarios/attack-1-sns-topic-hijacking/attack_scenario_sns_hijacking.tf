@@ -95,8 +95,8 @@ resource "aws_sns_topic_policy" "admin_alerts_policy" {
         Effect = "Allow"
         Principal = "*"  # VULNERABILITY: Too permissive
         Action = [
-          "sns:Subscribe",
-          "sns:ConfirmSubscription"
+          "sns:Subscribe"
+          # Removed "sns:ConfirmSubscription" - not valid for topic policies
         ]
         Resource = aws_sns_topic.admin_alerts.arn
       },
