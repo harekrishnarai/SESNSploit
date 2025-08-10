@@ -356,32 +356,67 @@ resource "aws_iam_role_policy_attachment" "cross_account_admin" {
 # Create SES identity for additional attack vectors
 resource "aws_ses_email_identity" "vulnerable_ses_identity" {
   email = "notifications@${var.environment}.example.com"
+  
+  # Note: aws_ses_email_identity doesn't support tags
+}
+
+# Create SNS topic for S3 integration
+resource "aws_sns_topic" "s3_integration_topic" {
+  name = "${var.environment}-s3-integration"
 
   tags = {
     Environment = var.environment
-    Purpose     = "SES identity for testing"
+    Purpose     = "S3 integration topic for SES events"
+    Attack      = "Cross-Service Integration"
   }
+}
+
+# Vulnerable policy for S3 integration topic
+resource "aws_sns_topic_policy" "s3_integration_policy" {
+  arn = aws_sns_topic.s3_integration_topic.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowSESPublish"
+        Effect = "Allow"
+        Principal = {
+          Service = "ses.amazonaws.com"
+        }
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = aws_sns_topic.s3_integration_topic.arn
+      },
+      {
+        Sid    = "AllowPublicSubscribe"
+        Effect = "Allow"
+        Principal = "*"  # VULNERABILITY: Anyone can subscribe
+        Action = [
+          "sns:Subscribe"
+        ]
+        Resource = aws_sns_topic.s3_integration_topic.arn
+      }
+    ]
+  })
 }
 
 # SES configuration set for S3 integration
 resource "aws_ses_configuration_set" "vulnerable_ses_config" {
   name = "${var.environment}-vulnerable-ses-config"
-
-  tags = {
-    Environment = var.environment
-    Purpose     = "Vulnerable SES configuration"
-  }
+  
+  # Note: aws_ses_configuration_set doesn't support tags
 }
 
-# SES event destination pointing to S3 - potential data exposure
-resource "aws_ses_event_destination" "s3_events" {
-  name                   = "s3-events"
+# SES event destination pointing to SNS
+resource "aws_ses_event_destination" "sns_events" {
+  name                   = "sns-events"
   configuration_set_name = aws_ses_configuration_set.vulnerable_ses_config.name
   enabled                = true
 
-  s3_destination {
-    bucket_name = aws_s3_bucket.vulnerable_data_bucket.bucket
-    object_key_prefix = "ses-events/"
+  sns_destination {
+    topic_arn = aws_sns_topic.s3_integration_topic.arn
   }
 
   matching_types = [
