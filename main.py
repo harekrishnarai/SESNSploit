@@ -40,7 +40,7 @@ def pause():
 def figlet_header():
     ascii_art = pyfiglet.figlet_format("SESNSploit", font="slant")
     print(Fore.RED + ascii_art + Style.RESET_ALL)
-    print(f"{Fore.YELLOW}Copyright © {COPYRIGHT_OWNER}{Style.RESET_ALL}")
+#    print(f"{Fore.YELLOW}Copyright © {COPYRIGHT_OWNER}{Style.RESET_ALL}")
 
 def list_available_profiles():
     profiles = []
