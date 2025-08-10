@@ -19,7 +19,7 @@ import platform  # Used for clearing the console
 colorama.init(autoreset=True)
 
 # Global Variables
-COPYRIGHT_OWNER = "Harekrishna Rai"
+COPYRIGHT_OWNER = ""
 regions = [
     'af-south-1', 'ap-east-1', 'ap-northeast-1', 'ap-northeast-2', 'ap-northeast-3', 'ap-south-1',
     'ap-southeast-1', 'ap-southeast-2', 'ap-southeast-3', 'ca-central-1', 'eu-central-1',
@@ -40,7 +40,7 @@ def pause():
 def figlet_header():
     ascii_art = pyfiglet.figlet_format("SESNSploit", font="slant")
     print(Fore.RED + ascii_art + Style.RESET_ALL)
-    print(f"{Fore.YELLOW}Copyright © {COPYRIGHT_OWNER}{Style.RESET_ALL}")
+#    print(f"{Fore.YELLOW}Copyright © {COPYRIGHT_OWNER}{Style.RESET_ALL}")
 
 def list_available_profiles():
     profiles = []
